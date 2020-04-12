@@ -19,6 +19,7 @@ echo "stocksight docker container started"
 echo "shell into the container and run python sentiment.py -h"
 echo
 echo "*******************************************************"
+echo "************************ RUN PYTHON WEBSOCKET**********"
 
 while true; do
     sleep 3600

@@ -26,7 +26,7 @@
             socket.on('message', function (msg) {
                 var $divNewCard = $('<div>', {id: ('card' + (++cardCount)), class: 'card col-lg-6'});
                 var $divCardBlock = $('<div>', {class: 'card-block'});
-                var $divCardTitle = $('<h4>', {class: 'card-title'}).append(msg.title);
+                var $divCardTitle = $('<h4>', {class: 'card-title'}).append(msg.location);
                 var $divCardText = $('<p>', {class: 'card-text'}).append(msg.text);
                 var $divNewCardComplete = $divNewCard
                     .append($divCardBlock)

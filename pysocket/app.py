@@ -3,13 +3,12 @@ import random
 from time import sleep
 
 from aiohttp import web
-
+from sentiment import data
 import socketio
 
 sio = socketio.AsyncServer(async_mode='aiohttp', cors_allowed_origins='*')
 app = web.Application()
 sio.attach(app)
-
 
 async def background_task():
     """Example of how to send server generated events to clients."""
@@ -94,14 +93,22 @@ async def print_message(sid, message):
     print("Socket ID: ", sid)
     print(message)
 
-
 @sio.on('message')
 async def print_message(sid, message):
     print("Socket ID: ", sid)
     print(message)
     # await a successful emit of our reversed message
     # back to the client
-    await sio.emit('message', "This is the first ping from server socker hahahhahahhahah")
+    # screen_name = str(dict_data.get("user", {}).get("screen_name"))
+    # location = str(dict_data.get("user", {}).get("location"))
+    # language = str(dict_data.get("user", {}).get("lang"))
+    # friends = int(dict_data.get("user", {}).get("friends_count"))
+    # followers = int(dict_data.get("user", {}).get("followers_count"))
+    # statuses = int(dict_data.get("user", {}).get("statuses_count"))
+    # text_filtered = str(textclean)
+    # tweetid = int(dict_data.get("id"))
+    # text_raw = str(dict_data.get("text"))
+    await sio.emit('message', data[-1])
 
 
 @sio.on('message')
@@ -115,8 +122,8 @@ async def print_message(sid, message):
         i = i + 1
         sleep(1)
         await sio.emit('message', {'text': '"\nThis "' + str(i) + '" the first ping"',
-                                   'title':'My title'+str(i),
-                                   'content': 'no content for'+str(i)
+                                   'title': 'My title' + str(i),
+                                   'content': 'no content for' + str(i)
                                    })
 
 
@@ -138,4 +145,4 @@ app.router.add_get('/home', home)
 
 if __name__ == '__main__':
     sio.start_background_task(background_task)
-    web.run_app(app)
+    web.run_app(app,host='0.0.0.0')
