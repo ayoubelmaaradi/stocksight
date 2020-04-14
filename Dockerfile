@@ -15,7 +15,7 @@ ADD pysocket/ ./
 COPY startup.sh ./
 
 ENV PYTHONIOENCODING=utf8
-RUN python sentiment.py -s TSLA -k 'Elon Musk',Musk,Tesla,SpaceX --debug &
-RUN cd pysocket && python app.py
+#RUN python sentiment.py -s TSLA -k 'Elon Musk',Musk,Tesla,SpaceX --debug &
+#RUN python app.py
 EXPOSE 8080
 ENTRYPOINT [ "bash", "startup.sh" ]

@@ -3,7 +3,7 @@ import random
 from time import sleep
 
 from aiohttp import web
-from sentiment import data
+from sentiment import datalist
 import socketio
 
 sio = socketio.AsyncServer(async_mode='aiohttp', cors_allowed_origins='*')
@@ -28,62 +28,9 @@ async def home(request):
     with open('home.html') as f:
         return web.Response(text=f.read(), content_type='text/html')
 
-
-@sio.event
-async def my_event(sid, message):
-    await sio.emit('my_response', {'data': message['data']}, room=sid)
-
-
-@sio.event
-async def my_broadcast_event(sid, message):
-    await sio.emit('my_response', {'data': message['data']})
-
-
-@sio.event
-async def join(sid, message):
-    sio.enter_room(sid, message['room'])
-    await sio.emit('my_response', {'data': 'Entered room: ' + message['room']},
-                   room=sid)
-
-
-@sio.event
-async def leave(sid, message):
-    sio.leave_room(sid, message['room'])
-    await sio.emit('my_response', {'data': 'Left room: ' + message['room']},
-                   room=sid)
-
-
-@sio.event
-async def close_room(sid, message):
-    await sio.emit('my_response',
-                   {'data': 'Room ' + message['room'] + ' is closing.'},
-                   room=message['room'])
-    await sio.close_room(message['room'])
-
-
-@sio.event
-async def my_room_event(sid, message):
-    await sio.emit('my_response', {'data': message['data']},
-                   room=message['room'])
-
-
 @sio.event
 async def disconnect_request(sid):
     await sio.disconnect(sid)
-
-
-@sio.event
-async def connect(sid, environ):
-    await sio.emit('my_response', {'data': 'Connected', 'count': 0}, room=sid)
-
-
-decide = True
-
-
-def val():
-    if decide == True:
-        return False
-
 
 @sio.on('message')
 async def print_message(sid, message):
@@ -108,7 +55,8 @@ async def print_message(sid, message):
     # text_filtered = str(textclean)
     # tweetid = int(dict_data.get("id"))
     # text_raw = str(dict_data.get("text"))
-    await sio.emit('message', data[-1])
+
+    #await sio.emit('message', datalist[-1])
 
 
 @sio.on('message')
@@ -117,21 +65,10 @@ async def print_message(sid, message):
     print(message)
     # await a successful emit of our reversed message
     # back to the client
-    i = 0
-    while (i < 100):
-        i = i + 1
+    n = len(datalist)
+    while (datalist is not None):
         sleep(1)
-        await sio.emit('message', {'text': '"\nThis "' + str(i) + '" the first ping"',
-                                   'title': 'My title' + str(i),
-                                   'content': 'no content for' + str(i)
-                                   })
-
-
-@sio.on('data2')
-async def chart_builder():
-    decide = val()
-    await sio.send(data=[50, random.randint(52, 700), random.randint(52, 700), random.randint(52, 700), 20, 265,
-                         random.randint(52, 700), 400])
+        await sio.emit('message', datalist[n-1])
 
 
 @sio.event

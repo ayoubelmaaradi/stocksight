@@ -53,7 +53,7 @@ if not IS_PY3:
 
 # sentiment text-processing url
 sentimentURL = 'http://text-processing.com/api/sentiment/'
-
+json_tweet = json.dumps({})
 # stocksight website url data collector
 stocksightURL = 'https://stocksight.diskoverspace.com/data_collector.php'
 
@@ -65,7 +65,7 @@ twitter_users_file = './twitteruserids.txt'
 
 prev_time = time.time()
 sentiment_avg = [0.0, 0.0, 0.0]
-data = []
+datalist = []
 
 
 class TweetStreamListener(StreamListener):
@@ -120,7 +120,7 @@ class TweetStreamListener(StreamListener):
             text_filtered = str(textclean)
             tweetid = int(dict_data.get("id"))
             text_raw = str(dict_data.get("text"))
-            data.append(json.dumps(dict_data))
+            datalist.append(json.dumps(dict_data))
             # output twitter data
             print("\n<------------------------------")
             print("Tweet Date: " + created_date)
@@ -246,8 +246,20 @@ class TweetStreamListener(StreamListener):
                                "polarity": polarity,
                                "subjectivity": subjectivity,
                                "sentiment": sentiment})
+                json_tweet = json.dumps({"author": screen_name,
+                                         "location": location,
+                                         "language": language,
+                                         "friends": friends,
+                                         "followers": followers,
+                                         "statuses": statuses,
+                                         "date": created_date,
+                                         "message": text_filtered,
+                                         "tweet_id": tweetid,
+                                         "polarity": polarity,
+                                         "subjectivity": subjectivity,
+                                         "sentiment": sentiment})
 
-            # randomly sleep to stagger request time
+                # randomly sleep to stagger request time
             time.sleep(randrange(2, 5))
             return True
 
@@ -294,7 +306,8 @@ class NewsHeadlineListener:
                     # output news data
                     print("\n------------------------------> (news headlines: %s, filtered: %s, filter-ratio: %s)" \
                           % (
-                          self.count, self.count_filtered, str(round(self.count_filtered / self.count * 100, 2)) + "%"))
+                              self.count, self.count_filtered,
+                              str(round(self.count_filtered / self.count * 100, 2)) + "%"))
                     print("Date: " + datenow)
                     print("News Headline: " + htext)
                     print("Location (url): " + htext_url)
@@ -675,6 +688,92 @@ def upload_sentiment(neg, pos, neu):
         logger.warning("Can't upload sentiment to stocksight website caused by %s" % post.status_code)
 
 
+#########################################################################################""""""
+import asyncio
+import random
+from time import sleep
+
+from aiohttp import web
+from sentiment import datalist
+import socketio
+
+sio = socketio.AsyncServer(async_mode='aiohttp', cors_allowed_origins='*')
+app = web.Application()
+sio.attach(app)
+
+
+async def background_task():
+    """Example of how to send server generated events to clients."""
+    count = 0
+    while True:
+        await sio.sleep(10)
+        count += 1
+        await sio.emit('my_response', {'data': 'Server generated event'})
+
+
+async def index(request):
+    with open('app.html') as f:
+        return web.Response(text=f.read(), content_type='text/html')
+
+
+async def home(request):
+    with open('home.html') as f:
+        return web.Response(text=f.read(), content_type='text/html')
+
+
+@sio.event
+async def disconnect_request(sid):
+    await sio.disconnect(sid)
+
+
+@sio.on('message')
+async def print_message(sid, message):
+    # When we receive a new event of type
+    # 'message' through a socket.io connection
+    # we print the socket ID and the message
+    print("Socket ID: ", sid)
+    print(message)
+
+
+@sio.on('message')
+async def print_message(sid, message):
+    print("Socket ID: ", sid)
+    print(message)
+    # await a successful emit of our reversed message
+    # back to the client
+    # screen_name = str(dict_data.get("user", {}).get("screen_name"))
+    # location = str(dict_data.get("user", {}).get("location"))
+    # language = str(dict_data.get("user", {}).get("lang"))
+    # friends = int(dict_data.get("user", {}).get("friends_count"))
+    # followers = int(dict_data.get("user", {}).get("followers_count"))
+    # statuses = int(dict_data.get("user", {}).get("statuses_count"))
+    # text_filtered = str(textclean)
+    # tweetid = int(dict_data.get("id"))
+    # text_raw = str(dict_data.get("text"))
+
+    # await sio.emit('message', datalist[-1])
+
+
+@sio.on('message')
+async def print_message(sid, message):
+    print("Socket ID: ", sid)
+    print(message)
+    # await a successful emit of our reversed message
+    # back to the client
+    while (json_tweet is not None):
+        sleep(1)
+        await sio.emit('message', json_tweet)
+
+
+@sio.event
+def disconnect(sid):
+    print('Client disconnected')
+
+
+app.router.add_static('/static', 'static')
+app.router.add_get('/', index)
+app.router.add_get('/home', home)
+
 if __name__ == '__main__':
     # parse cli args
     parser = argparse.ArgumentParser()
@@ -925,6 +1024,10 @@ if __name__ == '__main__':
         logger.info('Creating new Elasticsearch index or using existing ' + args.index)
         es.indices.create(index=args.index, body=mappings, ignore=[400, 404])
 
+    ############################################"""""""""
+    #sio.start_background_task(background_task)
+    #web.run_app(app, host='0.0.0.0')
+    ############################################
     # check if we need to override any tokens
     if args.overridetokensreq:
         nltk_tokens_required = tuple(args.overridetokensreq)

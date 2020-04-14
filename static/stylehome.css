@@ -1,0 +1,20 @@
+@import "~bootstrap";
+.card {
+  margin: 10px;
+  border: 1px solid #c3c3c3;
+}
+.div-scroll {
+  position: absolute;
+  overflow-y: scroll;
+}
+.body{
+  background-color: rgba(235, 252, 255, 0);
+  font: 11px Monaco, Courier New;
+}
+.date {
+  margin-right: 10px;
+}
+.author {
+  color: rgba(204, 204, 204, 0.87);
+  padding-left: 90px;
+}
