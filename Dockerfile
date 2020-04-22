@@ -11,7 +11,7 @@ RUN python -c "import nltk; nltk.download('punkt'); nltk.download('stopwords')"
 RUN python -m pip install "urllib3<1.25"
 COPY sentiment.py ./
 COPY stockprice.py ./
-ADD pysocket/ ./
+ADD api ./
 COPY startup.sh ./
 
 ENV PYTHONIOENCODING=utf8
