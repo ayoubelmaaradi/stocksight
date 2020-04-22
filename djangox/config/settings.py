@@ -23,6 +23,7 @@ INSTALLED_APPS = [
     'whitenoise.runserver_nostatic',
     'django.contrib.staticfiles',
     'django.contrib.sites',
+    'socketio_app',
     #'stream_twitter',
     #'stream_django',
 

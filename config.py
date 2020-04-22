@@ -1,5 +1,5 @@
-elasticsearch_host = "localhost"
-elasticsearch_port = 4200
+elasticsearch_host = '127.0.0.1'
+elasticsearch_port = 9200
 elasticsearch_user = ""
 elasticsearch_password = ""
 consumer_key= 'p9smvhLm9SXh9z2EUNYyakFe7'

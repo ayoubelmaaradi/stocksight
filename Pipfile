@@ -1,0 +1,30 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[dev-packages]
+
+[packages]
+elasticsearch = ">=5.0.0,<6.0.0"
+requests = "*"
+nltk = "*"
+tweepy = "*"
+beautifulsoup4 = "*"
+textblob = "*"
+vadersentiment = "*"
+newspaper3k = "*"
+aiohttp = "==3.5.4"
+async-timeout = "==1.1.0"
+chardet = "==3.0.2"
+multidict = "==2.1.4"
+python-engineio = "*"
+python-socketio = "*"
+six = "==1.10.0"
+yarl = "==0.9.2"
+enum-compat = "==0.0.2"
+eventlet = "==0.21.0"
+pytz = "==2018.7"
+
+[requires]
+python_version = "3.7"
