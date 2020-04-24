@@ -2,6 +2,7 @@ elasticsearch_host = '127.0.0.1'
 elasticsearch_port = 9200
 elasticsearch_user = ""
 elasticsearch_password = ""
+elasticsearch_index="stocksight"
 consumer_key= 'p9smvhLm9SXh9z2EUNYyakFe7'
 consumer_secret= 'Fu6f5YWPyEfrUwpGS02Ojm2eMSxanySYzvkhP7ypVLtlCvIvgy'
 access_token= '809287937351249920-2S2imOpJVEy0oxDlGwVADh3wM2WPVpY'

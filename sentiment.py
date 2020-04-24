@@ -8,7 +8,7 @@ for more information.
 
 Copyright (C) Chris Park 2018-2020
 stocksight is released under the Apache 2.0 license. See
-LICENSE for the full license text.
+cred for the full license text.
 """
 
 import sys
@@ -117,6 +117,9 @@ class TweetStreamListener(StreamListener):
             friends = int(dict_data.get("user", {}).get("friends_count"))
             followers = int(dict_data.get("user", {}).get("followers_count"))
             statuses = int(dict_data.get("user", {}).get("statuses_count"))
+            favorite_count = dict_data.get("user", {}).get("favorite_count")
+            retweet_count = dict_data.get("user", {}).get("retweet_count")
+            reply_count = dict_data.get("user", {}).get("reply_count")
             text_filtered = str(textclean)
             tweetid = int(dict_data.get("id"))
             text_raw = str(dict_data.get("text"))
@@ -128,6 +131,9 @@ class TweetStreamListener(StreamListener):
             print("Location: " + location)
             print("Language: " + language)
             print("Friends: " + str(friends))
+            print("favorite_count: " + str(favorite_count))
+            print("retweet_count: " + str(retweet_count))
+            print("reply_count: " + str(reply_count))
             print("Followers: " + str(followers))
             print("Statuses: " + str(statuses))
             print("Tweet ID: " + str(tweetid))
@@ -245,6 +251,9 @@ class TweetStreamListener(StreamListener):
                                "tweet_id": tweetid,
                                "polarity": polarity,
                                "subjectivity": subjectivity,
+                               "reply_count":reply_count,## added
+                               "favorite_count":favorite_count,## added
+                               "retweet_count":retweet_count,## added
                                "sentiment": sentiment})
                 json_tweet = json.dumps({"author": screen_name,
                                          "location": location,
@@ -930,6 +939,15 @@ if __name__ == '__main__':
                                 }
                             }
                         },
+                        "retweet_count": {##### added
+                            "type": "long"
+                        },
+                        "favorite_count": {
+                            "type": "long"
+                        },
+                        "reply_count": {
+                            "type": "long"
+                        },###
                         "friends": {
                             "type": "long"
                         },

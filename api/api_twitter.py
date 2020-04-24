@@ -4,29 +4,33 @@ from flask_restful import Resource, Api
 from json import dumps
 from flask_jsonpify import jsonify
 
+from api.elastic_queries import get_top_tweets
+
 app = Flask(__name__)
 api = Api(app)
 
 CORS(app)
 
+
 @app.route("/")
 def hello():
-    return jsonify({'text':'Hello World!'})
+    return jsonify({'text': 'Hello World!', 'Message': 'Tweets by API'})
 
-class Employees(Resource):
+
+class TopTweets(Resource):
     def get(self):
-        return {'employees': [{'id':1, 'name':'Balram'},{'id':2, 'name':'Tom'}]}
+        return jsonify(get_top_tweets())
 
-class Employees_Name(Resource):
-    def get(self, employee_id):
-        print('Employee id:' + employee_id)
-        result = {'data': {'id':1, 'name':'Balram'}}
+
+class TweetsByName(Resource):
+    def get(self, tweet_id):
+        print('Employee id:' + tweet_id)
+        result = {'data': {'id': 1, 'name': 'Balram'}}
         return jsonify(result)
 
 
-api.add_resource(Employees, '/employees') # Route_1
-api.add_resource(Employees_Name, '/employees/<employee_id>') # Route_3
-
+api.add_resource(TopTweets, '/top_tweets')  # Route_1
+api.add_resource(TweetsByName, '/tweets/<tweet_id>')  # Route_3
 
 if __name__ == '__main__':
-   app.run(port=5002)
+    app.run(port=9090)
