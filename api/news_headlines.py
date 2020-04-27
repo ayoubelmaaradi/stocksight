@@ -62,7 +62,7 @@ params = {
     'noelasticsearch': False,
     'store_true': True,
     'symbol': 'TESLA',
-    'keywords': 'tesla,elonmusk,spaceX,nuralink',
+    'keywords': 'oott',
     'addtokens': '',
     'url': False,
     'file': False,  # set to file name if ther is
@@ -190,9 +190,9 @@ class TweetStreamListener(StreamListener):
 
             # do some checks before adding to elasticsearch and crawling urls in tweet
             if friends == 0 or \
-                    followers == 0 or \
                     statuses == 0 or \
                     text == "" or \
+                    followers < 1000 or \
                     tweetid in tweet_ids:
                 logger.info("Tweet doesn't meet min requirements, not adding")
                 self.count_filtered += 1
@@ -326,10 +326,7 @@ class NewsHeadlineListener:
         self.count_filtered = 0
         self.filter_ratio = 0
 
-    def get_news(self):
-        list_of_news = []
-        news_head_lines = {'text': '', 'sentiment': ''}
-        if True:
+        while True:
             new_headlines = self.get_news_headlines(self.url)
 
             # add any new headlines
@@ -340,19 +337,23 @@ class NewsHeadlineListener:
 
                     datenow = datetime.utcnow().isoformat()
                     # output news data
-                    # print("\n------------------------------> (news headlines: %s, filtered: %s, filter-ratio: %s)" \
-                    #       % (
-                    #           self.count, self.count_filtered,
-                    #           str(round(self.count_filtered / self.count * 100, 2)) + "%"))
-                    # print("Date: " + datenow)
-                    # print("News Headline: " + htext)
-                    # print("Location (url): " + htext_url)
-                    news_head_lines['text'] = htext
+                    print("\n------------------------------> (news headlines: %s, filtered: %s, filter-ratio: %s)" \
+                          % (
+                              self.count, self.count_filtered,
+                              str(round(self.count_filtered / self.count * 100, 2)) + "%"))
+                    print("Date: " + datenow)
+                    print("News Headline: " + htext)
+                    print("Location (url): " + htext_url)
+                    es.index(index=params['index'],doc_type='newsheadlines',body={
+                        'text': htext,
+                        'date': datenow,
+                        'htext_url': htext_url
+                    })
                     # create tokens of words in text using nltk
                     text_for_tokens = re.sub(
                         r"[\%|\$|\.|\,|\!|\:|\@]|\(|\)|\#|\+|(``)|('')|\?|\-", "", htext)
                     tokens = nltk.word_tokenize(text_for_tokens)
-                    #print("NLTK Tokens: " + str(tokens))
+                    print("NLTK Tokens: " + str(tokens))
 
                     # check for min token length
                     if len(tokens) < 5:
@@ -380,10 +381,7 @@ class NewsHeadlineListener:
                     # get sentiment values
                     polarity, subjectivity, sentiment = sentiment_analysis(htext)
 
-                    news_head_lines['sentiment'] = sentiment
-                    list_of_news.append(news_head_lines)
-
-                    if True:  # not params['noelasticsearch']:
+                    if not params['noelasticsearch']:
                         logger.info("Adding news headline to elasticsearch")
                         # add news headline data and sentiment info to elasticsearch
                         es.index(index=params['index'],
@@ -394,10 +392,9 @@ class NewsHeadlineListener:
                                        "polarity": polarity,
                                        "subjectivity": subjectivity,
                                        "sentiment": sentiment})
-                        print('-----stored in elastic search-----')
+
             logger.info("Will get news headlines again in %s sec..." % self.frequency)
-            return news_head_lines
-            #time.sleep(self.frequency)
+            time.sleep(self.frequency)
 
     def get_news_headlines(self, url):
 
@@ -443,7 +440,6 @@ class NewsHeadlineListener:
             pass
 
         return latestheadlines
-
 
 def get_page_text(url):
     max_paragraphs = 10
@@ -955,8 +951,6 @@ if __name__ == '__main__':
 
             # create instance of NewsHeadlineListener
             newslistener = NewsHeadlineListener(url, params['ferquency'])
-            des_news = newslistener.get_news()
-            print('----------->', des_news)
         except KeyboardInterrupt:
             print("Ctrl-c keyboard interrupt, exiting...")
             sys.exit(0)

@@ -2,7 +2,7 @@ from builtins import type
 
 from elasticsearch import Elasticsearch
 
-from api.query_dsl_es import query_most_retweeted
+from api.query_es import query_most_retweeted
 from config import elasticsearch_host, elasticsearch_port, elasticsearch_password, elasticsearch_user, \
     elasticsearch_index
 
@@ -33,12 +33,30 @@ def get_top_tweets():
     list = []
     i = 0
     for item in res['aggregations']['top_tags']['buckets']:
-        #print(item['terms']['hits']['hits'][0]['_source']['date'])
+        # print(item['terms']['hits']['hits'][0]['_source']['date'])
         list.append(item['key'])
     return list
 
 
+def get_news_headlines():
+    list_res = []
+    results = es.search(index='stocksight', doc_type='newsheadline', body={
+        "query": {
+            "match_all": {}
+        }
+    })
+    for hit in results['hits']['hits']:
+        print(hit['_source']['message'])
+        list_res.append({'text': hit['_source']['message'],'date':hit['_source']['date'] })
+    return list_res
+
+
+
 if __name__ == '__main__':
-    var = get_top_tweets()
-    for elem in var[5:]:
-        print('------', elem, '-----\n')
+    # var = get_top_tweets()
+    # for elem in var[5:]:
+    #     print('------', elem, '-----\n')
+    var = get_news_headlines()
+    for item in var:
+        print(item['text'],'\n')
+        print('----------------------------------------------------------------------------------------')
