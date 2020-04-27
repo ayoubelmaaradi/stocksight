@@ -29,3 +29,5 @@ defaults:
     values:
       layout: splash
       author_profile: true
+
+theme: jekyll-theme-merlot
