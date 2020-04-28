@@ -24,6 +24,8 @@ CONSUMER_SECRET = 'Fu6f5YWPyEfrUwpGS02Ojm2eMSxanySYzvkhP7ypVLtlCvIvgy'
 ACCESS_TOKEN = '809287937351249920-2S2imOpJVEy0oxDlGwVADh3wM2WPVpY'
 ACCESS_TOKEN_SECRET = 'EkF2JQx9jcsBOyyMU4UsZYgFqLWJ1UH0W8NCDPL7Axnbs'
 
+auth = OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
+auth.set_access_token(ACCESS_TOKEN, ACCESS_TOKEN_SECRET)
 DATA_FOLDER = './'
 es = Elasticsearch(hosts=[{'host': elasticsearch_host, 'port': elasticsearch_port}],
                    http_auth=(elasticsearch_user, elasticsearch_password))
@@ -116,10 +118,8 @@ def isEnglish(s):
 
 if __name__ == '__main__':
     # This handles Twitter authentication and the connection to Twitter Streaming API
-    l = StdOutListener()
-    auth = OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
-    auth.set_access_token(ACCESS_TOKEN, ACCESS_TOKEN_SECRET)
     TOPICS = 'hashtags.txt'
+    l = StdOutListener()
     for topic in open(TOPICS, 'r'):
         # if(isEnglish(topic)):
         query_through_search(str(topic).encode('utf-8').strip())

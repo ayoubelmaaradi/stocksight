@@ -374,7 +374,7 @@ class NewsHeadlineListener:
                             tokenspass = True
                             break
                     if not tokenspass:
-                        logger.info("Text does not contain token from required list, not adding")
+                        logger.info("Text does not contain token from required list, not adding # added btw")
                         self.count_filtered += 1
                         continue
 
@@ -725,7 +725,7 @@ def upload_sentiment(neg, pos, neu):
         logger.warning("Can't upload sentiment to stocksight website caused by %s" % post.status_code)
 
 
-if __name__ == '__main__':
+def main_news_headlines():
     # check symbol for illegal characters and length
     if ' ' in params['symbol']:
         sys.exit("Symbol cannot contain any spaces")
@@ -945,8 +945,8 @@ if __name__ == '__main__':
         try:
             url = "https://finance.yahoo.com/quote/%s/?p=%s" % (params['symbol'], params['symbol'])
 
-            logger.info('NLTK tokens required: ' + str(nltk_tokens_required))
-            logger.info('NLTK tokens ignored: ' + str(nltk_tokens_ignored))
+            # logger.info('NLTK tokens required: ' + str(nltk_tokens_required))
+            # logger.info('NLTK tokens ignored: ' + str(nltk_tokens_ignored))
             logger.info("Scraping news for %s from %s ..." % (params['symbol'], url))
 
             # create instance of NewsHeadlineListener
@@ -956,3 +956,5 @@ if __name__ == '__main__':
             sys.exit(0)
 
     # elif True:
+if __name__ == '__main__':
+    main_news_headlines()

@@ -14,11 +14,11 @@ es = Elasticsearch(hosts=[{'host': elasticsearch_host, 'port': elasticsearch_por
 
 # es.indices.refresh(index=elasticsearch_index)
 
-res = es.search(index=elasticsearch_index, body=query_most_retweeted)
 
 
 # print(res['hits']['hits'][0])
 def total_hits():
+    res = es.search(index=elasticsearch_index, body=query_most_retweeted)
     for hit in res['hits']['hits']:
         print('-------------------------------------------------------------')
         print(hit["_source"]['author'])
@@ -30,6 +30,7 @@ def total_hits():
 
 # es.indices.delete(index=elasticsearch_index, ignore=[400, 404])
 def get_top_tweets():
+    res = es.search(index=elasticsearch_index, body=query_most_retweeted)
     list = []
     i = 0
     for item in res['aggregations']['top_tags']['buckets']:
@@ -47,16 +48,28 @@ def get_news_headlines():
     })
     for hit in results['hits']['hits']:
         print(hit['_source']['message'])
-        list_res.append({'text': hit['_source']['message'],'date':hit['_source']['date'] })
+        list_res.append({'text': hit['_source']['message'], 'date': hit['_source']['date']})
     return list_res
 
+
+def get_tweets_of_search_query():
+    list_res = []
+    results = es.search(index='stocksight', doc_type='tweets', body={
+        "query": {
+            "match_all": {}
+        }
+    })
+    for hit in results['hits']['hits']:
+        print(hit['_source']['text'])
+        list_res.append({'text': hit['_source']['text'], 'date': hit['_source']['date']})
+    return list_res
 
 
 if __name__ == '__main__':
     # var = get_top_tweets()
     # for elem in var[5:]:
     #     print('------', elem, '-----\n')
-    var = get_news_headlines()
+    var = get_tweets_of_search_query()
     for item in var:
-        print(item['text'],'\n')
+        print(item['text'], '\n')
         print('----------------------------------------------------------------------------------------')
