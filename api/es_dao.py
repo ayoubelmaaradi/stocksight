@@ -2,7 +2,7 @@ from builtins import type
 
 from elasticsearch import Elasticsearch
 
-from api.query_es import query_most_retweeted
+from api.es_string_query import query_most_retweeted
 from config import elasticsearch_host, elasticsearch_port, elasticsearch_password, elasticsearch_user, \
     elasticsearch_index
 
