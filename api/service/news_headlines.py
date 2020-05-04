@@ -20,7 +20,7 @@ import nltk
 import argparse
 import logging
 import string
-import redis
+
 try:
     import urllib.parse as urlparse
 except ImportError:
@@ -46,7 +46,7 @@ STOCKSIGHT_VERSION = '0.1-b.10'
 __version__ = STOCKSIGHT_VERSION
 
 IS_PY3 = sys.version_info >= (3, 0)
-redis_conn = redis.Redis(host='localhost', port=6379, db=0)
+list_of_news = []
 if not IS_PY3:
     print("Sorry, stocksight does not work with Python 2.")
     sys.exit(1)
@@ -56,7 +56,33 @@ sentimentURL = 'http://text-processing.com/api/sentiment/'
 json_tweet = json.dumps({})
 # stocksight website url data collector
 stocksightURL = 'https://stocksight.diskoverspace.com/data_collector.php'
-
+import redis
+redis_conn = redis.Redis(host='localhost', port=6379, db=0)
+params = {
+    'index': 'stocksight',
+    'deleteindex': False,
+    'noelasticsearch': False,
+    'store_true': True,
+    'symbol': 'TESLA',
+    'keywords': 'oott',
+    'addtokens': '',
+    'url': False,
+    'file': False,  # set to file name if ther is
+    'upload': False,
+    'link sentiment': True,  # follow links in tweets and analyze them
+    'newsheadlines': True,  # follow news headlines
+    'websentiment': False,  # get sentiment from web processing websites
+    'ferquency': 1200,  # ferquency of retrieving news 120s
+    'followlinks': True,  # Follow links on news headlines and scrape relevant text from landing page
+    'overridetockenntlk': '',  # Override nltk required tokens from config, separate with space
+    'overridetockenntlkignore': '',  # Override nltk ignore tokens from config, separate with space
+    'verbose': False,
+    'debug': True,
+    'quiet': True
+}
+logger = logging.getLogger('applicationstock')
+es = Elasticsearch(hosts=[{'host': elasticsearch_host, 'port': elasticsearch_port}],
+                   http_auth=(elasticsearch_user, elasticsearch_password))
 # tweet id list
 tweet_ids = []
 
@@ -94,7 +120,7 @@ class TweetStreamListener(StreamListener):
 
             # grab html links from tweet
             tweet_urls = []
-            if args.linksentiment:
+            if params['link sentiment']:
                 tweet_urls = re.findall(r'(https?://[^\s]+)', text)
 
             # clean up tweet text
@@ -166,9 +192,9 @@ class TweetStreamListener(StreamListener):
 
             # do some checks before adding to elasticsearch and crawling urls in tweet
             if friends == 0 or \
-                    followers == 0 or \
                     statuses == 0 or \
                     text == "" or \
+                    followers < 1000 or \
                     tweetid in tweet_ids:
                 logger.info("Tweet doesn't meet min requirements, not adding")
                 self.count_filtered += 1
@@ -235,10 +261,10 @@ class TweetStreamListener(StreamListener):
                 if tweet_urls_subjectivity > 0:
                     subjectivity = (subjectivity + tweet_urls_subjectivity) / 2
 
-            if not args.noelasticsearch:
+            if not params['noelasticsearch']:
                 logger.info("Adding tweet to elasticsearch")
                 # add twitter data and sentiment info to elasticsearch
-                es.index(index=args.index,
+                es.index(index=params['index'],
                          doc_type="tweet",
                          body={"author": screen_name,
                                "location": location,
@@ -251,9 +277,9 @@ class TweetStreamListener(StreamListener):
                                "tweet_id": tweetid,
                                "polarity": polarity,
                                "subjectivity": subjectivity,
-                               "reply_count":reply_count,## added
-                               "favorite_count":favorite_count,## added
-                               "retweet_count":retweet_count,## added
+                               "reply_count": reply_count,  ## added
+                               "favorite_count": favorite_count,  ## added
+                               "retweet_count": retweet_count,  ## added
                                "sentiment": sentiment})
                 json_tweet = json.dumps({"author": screen_name,
                                          "location": location,
@@ -267,7 +293,7 @@ class TweetStreamListener(StreamListener):
                                          "polarity": polarity,
                                          "subjectivity": subjectivity,
                                          "sentiment": sentiment})
-                #redis_conn.hmset('')
+
                 # randomly sleep to stagger request time
             time.sleep(randrange(2, 5))
             return True
@@ -293,7 +319,7 @@ class TweetStreamListener(StreamListener):
 
 class NewsHeadlineListener:
 
-    def __init__(self, url=None, frequency=120):
+    def __init__(self, url=None, frequency=600):
         self.url = url
         self.headlines = []
         self.followedlinks = []
@@ -320,7 +346,18 @@ class NewsHeadlineListener:
                     print("Date: " + datenow)
                     print("News Headline: " + htext)
                     print("Location (url): " + htext_url)
+                    es.index(index=params['index'],doc_type='newsheadlines',body={
+                        'text': htext,
+                        'date': datenow,
+                        'htext_url': htext_url
+                    })
+                    list_of_news.append({
+                        'text': htext,
+                        'date': datenow,
+                        'htext_url': htext_url
+                    })
 
+                    # retrievin gby hmget()
                     # create tokens of words in text using nltk
                     text_for_tokens = re.sub(
                         r"[\%|\$|\.|\,|\!|\:|\@]|\(|\)|\#|\+|(``)|('')|\?|\-", "", htext)
@@ -346,17 +383,17 @@ class NewsHeadlineListener:
                             tokenspass = True
                             break
                     if not tokenspass:
-                        logger.info("Text does not contain token from required list, not adding")
+                        logger.info("Text does not contain token from required list, not adding # added btw")
                         self.count_filtered += 1
                         continue
 
                     # get sentiment values
                     polarity, subjectivity, sentiment = sentiment_analysis(htext)
 
-                    if not args.noelasticsearch:
+                    if not params['noelasticsearch']:
                         logger.info("Adding news headline to elasticsearch")
                         # add news headline data and sentiment info to elasticsearch
-                        es.index(index=args.index,
+                        es.index(index=params['index'],
                                  doc_type="newsheadline",
                                  body={"date": datenow,
                                        "location": htext_url,
@@ -364,7 +401,8 @@ class NewsHeadlineListener:
                                        "polarity": polarity,
                                        "subjectivity": subjectivity,
                                        "sentiment": sentiment})
-
+            redis_conn.rpush('news_headlines', *list_of_news)
+            print(list_of_news)
             logger.info("Will get news headlines again in %s sec..." % self.frequency)
             time.sleep(self.frequency)
 
@@ -390,7 +428,7 @@ class NewsHeadlineListener:
                     latestheadlines.append((i.next.next.next.next, url))
             logger.debug(latestheadlines)
 
-            if args.followlinks:
+            if params['followlinks']:
                 if links:
                     for i in links:
                         if '/news/' in i['href']:
@@ -412,7 +450,6 @@ class NewsHeadlineListener:
             pass
 
         return latestheadlines
-
 
 def get_page_text(url):
     max_paragraphs = 10
@@ -505,7 +542,7 @@ def sentiment_analysis(text):
     """
 
     # pass text into sentiment url
-    if args.websentiment:
+    if params['websentiment']:
         ret = get_sentiment_from_url(text, sentimentURL)
         if ret is None:
             sentiment_url = None
@@ -538,7 +575,7 @@ def sentiment_analysis(text):
             sentiment = "neutral"
 
     # calculate average and upload to sentiment website
-    if args.upload:
+    if params['upload']:
         if sentiment_url:
             neg_avg = (text_vs['neg'] + neg_url) / 2
             pos_avg = (text_vs['pos'] + pos_url) / 2
@@ -656,6 +693,7 @@ def get_twitter_users_from_url(url):
 
 def get_twitter_users_from_file(file):
     # get twitter user ids from text file
+    logger = logging.getLogger('file')
     twitter_users = []
     logger.info("Grabbing any twitter user ids from file %s" % file)
     try:
@@ -681,10 +719,10 @@ def upload_sentiment(neg, pos, neu):
     sentiment_avg[2] = (sentiment_avg[2] + neu) / 2
     # don't upload more than once every 10 seconds for tweets
     time_now = time.time()
-    if not args.newsheadlines and time_now - prev_time < 10:
+    if not params['newsheadlines'] and time_now - prev_time < 10:
         return
     prev_time = time_now
-    payload = {'token': stocksight_token, 'symbol': args.symbol, 'neg': sentiment_avg[0], 'pos': sentiment_avg[1],
+    payload = {'token': stocksight_token, 'symbol': params['symbol'], 'neg': sentiment_avg[0], 'pos': sentiment_avg[1],
                'neu': sentiment_avg[2]}
     try:
         post = requests.post(stocksightURL, data=payload)
@@ -697,147 +735,11 @@ def upload_sentiment(neg, pos, neu):
         logger.warning("Can't upload sentiment to stocksight website caused by %s" % post.status_code)
 
 
-#########################################################################################""""""
-# import asyncio
-# import random
-# from time import sleep
-#
-# from aiohttp import web
-# from sentiment import datalist
-# import socketio
-#
-# sio = socketio.AsyncServer(async_mode='aiohttp', cors_allowed_origins='*')
-# app = web.Application()
-# sio.attach(app)
-#
-#
-# async def background_task():
-#     """Example of how to send server generated events to clients."""
-#     count = 0
-#     while True:
-#         await sio.sleep(10)
-#         count += 1
-#         await sio.emit('my_response', {'data': 'Server generated event'})
-#
-#
-# async def index(request):
-#     with open('app.html') as f:
-#         return web.Response(text=f.read(), content_type='text/html')
-#
-#
-# async def home(request):
-#     with open('home.html') as f:
-#         return web.Response(text=f.read(), content_type='text/html')
-#
-#
-# @sio.event
-# async def disconnect_request(sid):
-#     await sio.disconnect(sid)
-#
-#
-# @sio.on('message')
-# async def print_message(sid, message):
-#     # When we receive a new event of type
-#     # 'message' through a socket.io connection
-#     # we print the socket ID and the message
-#     print("Socket ID: ", sid)
-#     print(message)
-#
-#
-# @sio.on('message')
-# async def print_message(sid, message):
-#     print("Socket ID: ", sid)
-#     print(message)
-#     # await a successful emit of our reversed message
-#     # back to the client
-#     # screen_name = str(dict_data.get("user", {}).get("screen_name"))
-#     # location = str(dict_data.get("user", {}).get("location"))
-#     # language = str(dict_data.get("user", {}).get("lang"))
-#     # friends = int(dict_data.get("user", {}).get("friends_count"))
-#     # followers = int(dict_data.get("user", {}).get("followers_count"))
-#     # statuses = int(dict_data.get("user", {}).get("statuses_count"))
-#     # text_filtered = str(textclean)
-#     # tweetid = int(dict_data.get("id"))
-#     # text_raw = str(dict_data.get("text"))
-#
-#     # await sio.emit('message', datalist[-1])
-#
-#
-# @sio.on('message')
-# async def print_message(sid, message):
-#     print("Socket ID: ", sid)
-#     print(message)
-#     # await a successful emit of our reversed message
-#     # back to the client
-#     while (json_tweet is not None):
-#         sleep(1)
-#         await sio.emit('message', json_tweet)
-#
-#
-# @sio.event
-# def disconnect(sid):
-#     print('Client disconnected')
-#
-#
-# app.router.add_static('/static', 'static')
-# app.router.add_get('/', index)
-# app.router.add_get('/home', home)
-
-if __name__ == '__main__':
-    # parse cli args
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-i", "--index", metavar="INDEX", default="stocksight",
-                        help="Index name for Elasticsearch (default: stocksight)")
-    parser.add_argument("-d", "--delindex", action="store_true",
-                        help="Delete existing Elasticsearch index first")
-    parser.add_argument("-s", "--symbol", metavar="SYMBOL", required=True,
-                        help="Stock symbol you are interesed in searching for, example: TSLA "
-                             "This is used as the symbol tag on stocksight website. "
-                             "Could also be set to a tag name like 'elonmusk' or 'elon' etc. "
-                             "Cannot contain spaces and more than 25 characters.")
-    parser.add_argument("-k", "--keywords", metavar="KEYWORDS",
-                        help="Use keywords to search for in Tweets instead of feeds. "
-                             "Separated by comma, case insensitive, spaces are ANDs commas are ORs. "
-                             "Example: TSLA,'Elon Musk',Musk,Tesla,SpaceX")
-    parser.add_argument("-a", "--addtokens", action="store_true",
-                        help="Add nltk tokens required from config to keywords")
-    parser.add_argument("-u", "--url", metavar="URL",
-                        help="Use twitter users from any links in web page at url")
-    parser.add_argument("-f", "--file", metavar="FILE",
-                        help="Use twitter user ids from file")
-    parser.add_argument("-l", "--linksentiment", action="store_true",
-                        help="Follow any link url in tweets and analyze sentiment on web page")
-    parser.add_argument("-n", "--newsheadlines", action="store_true",
-                        help="Get news headlines instead of Twitter using stock symbol from -s")
-    parser.add_argument("--frequency", metavar="FREQUENCY", default=120, type=int,
-                        help="How often in seconds to retrieve news headlines (default: 120 sec)")
-    parser.add_argument("--followlinks", action="store_true",
-                        help="Follow links on news headlines and scrape relevant text from landing page")
-    parser.add_argument("-U", "--upload", action="store_true",
-                        help="Upload sentiment to stocksight website (BETA)")
-    parser.add_argument("-w", "--websentiment", action="store_true",
-                        help="Get sentiment results from text processing website")
-    parser.add_argument("--noelasticsearch", action="store_true",
-                        help="Don't connect or add new docs to Elasticsearch")
-    parser.add_argument("--overridetokensreq", metavar="TOKEN", nargs="+",
-                        help="Override nltk required tokens from config, separate with space")
-    parser.add_argument("--overridetokensignore", metavar="TOKEN", nargs="+",
-                        help="Override nltk ignore tokens from config, separate with space")
-    parser.add_argument("-v", "--verbose", action="store_true",
-                        help="Increase output verbosity")
-    parser.add_argument("--debug", action="store_true",
-                        help="Debug message output")
-    parser.add_argument("-q", "--quiet", action="store_true",
-                        help="Run quiet with no message output")
-    parser.add_argument("-V", "--version", action="version",
-                        version="stocksight v%s" % STOCKSIGHT_VERSION,
-                        help="Prints version and exits")
-    args = parser.parse_args()
-
+def main_news_headlines():
     # check symbol for illegal characters and length
-    if ' ' in args.symbol:
+    if ' ' in params['symbol']:
         sys.exit("Symbol cannot contain any spaces")
-    if len(args.symbol) > 25:
+    if len(params['symbol']) > 25:
         sys.exit("Symbol cannot be more than 25 characters")
 
     # set up logging
@@ -864,24 +766,24 @@ if __name__ == '__main__':
     logformatter = '%(asctime)s [%(levelname)s][%(name)s] %(message)s'
     loglevel = logging.INFO
     logging.basicConfig(format=logformatter, level=loglevel)
-    if args.verbose:
+    if params['verbose']:
         logger.setLevel(logging.INFO)
         eslogger.setLevel(logging.INFO)
         tweepylogger.setLevel(logging.INFO)
         requestslogger.setLevel(logging.INFO)
-    if args.debug:
+    if params['debug']:
         logger.setLevel(logging.DEBUG)
         eslogger.setLevel(logging.DEBUG)
         tweepylogger.setLevel(logging.DEBUG)
         requestslogger.setLevel(logging.DEBUG)
-    if args.quiet:
+    if params['quiet']:
         logger.disabled = True
         eslogger.disabled = True
         tweepylogger.disabled = True
         requestslogger.disabled = True
 
     # print banner
-    if not args.quiet:
+    if not params['quiet']:
         c = randint(1, 4)
         if c == 1:
             color = '31m'
@@ -905,10 +807,10 @@ if __name__ == '__main__':
             \033[0m""" % (color, STOCKSIGHT_VERSION)
         print(banner + '\n')
 
-    if not args.noelasticsearch:
+    if not params['noelasticsearch']:
         # create instance of elasticsearch
-        es = Elasticsearch(hosts=[{'host': elasticsearch_host, 'port': elasticsearch_port}],
-                           http_auth=(elasticsearch_user, elasticsearch_password))
+        # es = Elasticsearch(hosts=[{'host': elasticsearch_host, 'port': elasticsearch_port}],
+        #                    http_auth=(elasticsearch_user, elasticsearch_password))
 
         # set up elasticsearch mappings and create index
         mappings = {
@@ -939,7 +841,7 @@ if __name__ == '__main__':
                                 }
                             }
                         },
-                        "retweet_count": {##### added
+                        "retweet_count": {  ##### added
                             "type": "long"
                         },
                         "favorite_count": {
@@ -947,7 +849,7 @@ if __name__ == '__main__':
                         },
                         "reply_count": {
                             "type": "long"
-                        },###
+                        },  ###
                         "friends": {
                             "type": "long"
                         },
@@ -1035,132 +937,34 @@ if __name__ == '__main__':
             }
         }
 
-        if args.delindex:
-            logger.info('Deleting existing Elasticsearch index ' + args.index)
-            es.indices.delete(index=args.index, ignore=[400, 404])
+        if params['deleteindex']:
+            logger.info('Deleting existing Elasticsearch index ' + params['index'])
+            es.indices.delete(index=params['index'], ignore=[400, 404])
 
-        logger.info('Creating new Elasticsearch index or using existing ' + args.index)
-        es.indices.create(index=args.index, body=mappings, ignore=[400, 404])
-
-    ############################################"""""""""
-    #sio.start_background_task(background_task)
-    #web.run_app(app, host='0.0.0.0')
-    ############################################
+        logger.info('Creating new Elasticsearch index or using existing ' + params['index'])
+        es.indices.create(index=params['index'], body=mappings, ignore=[400, 404])
+    #
     # check if we need to override any tokens
-    if args.overridetokensreq:
-        nltk_tokens_required = tuple(args.overridetokensreq)
-    if args.overridetokensignore:
-        nltk_tokens_ignored = tuple(args.overridetokensignore)
+    if params['overridetockenntlk']:
+        nltk_tokens_required = tuple(params['overridetockenntlk'])
+    if params['overridetockenntlkignore']:
+        nltk_tokens_ignored = tuple(params['overridetockenntlkignore'])
 
     # are we grabbing news headlines from yahoo finance or twitter
-    if args.newsheadlines:
+    if params['newsheadlines']:
         try:
-            url = "https://finance.yahoo.com/quote/%s/?p=%s" % (args.symbol, args.symbol)
+            url = "https://finance.yahoo.com/quote/%s/?p=%s" % (params['symbol'], params['symbol'])
 
-            logger.info('NLTK tokens required: ' + str(nltk_tokens_required))
-            logger.info('NLTK tokens ignored: ' + str(nltk_tokens_ignored))
-            logger.info("Scraping news for %s from %s ..." % (args.symbol, url))
+            # logger.info('NLTK tokens required: ' + str(nltk_tokens_required))
+            # logger.info('NLTK tokens ignored: ' + str(nltk_tokens_ignored))
+            logger.info("Scraping news for %s from %s ..." % (params['symbol'], url))
 
             # create instance of NewsHeadlineListener
-            newslistener = NewsHeadlineListener(url, args.frequency)
+            newslistener = NewsHeadlineListener(url, params['ferquency'])
         except KeyboardInterrupt:
             print("Ctrl-c keyboard interrupt, exiting...")
             sys.exit(0)
 
-    else:
-        # create instance of the tweepy tweet stream listener
-        tweetlistener = TweetStreamListener()
-
-        # set twitter keys/tokens
-        auth = OAuthHandler(consumer_key, consumer_secret)
-        auth.set_access_token(access_token, access_token_secret)
-        api = API(auth)
-
-        # create instance of the tweepy stream
-        stream = Stream(auth, tweetlistener)
-        # grab any twitter users from links in web page at url
-        if args.url:
-            twitter_users = get_twitter_users_from_url(args.url)
-            if len(twitter_users) > 0:
-                twitter_feeds = twitter_users
-            else:
-                logger.info("No twitter users found in links on web page, exiting")
-                sys.exit(1)
-
-        # grab twitter users from file
-        if args.file:
-            twitter_users = get_twitter_users_from_file(args.file)
-            if len(twitter_users) > 0:
-                useridlist = twitter_users
-            else:
-                logger.info("No twitter users found in file, exiting")
-                sys.exit(1)
-        elif args.keywords is None:
-            # build user id list from user names
-            logger.info("Looking up Twitter user ids from usernames... (use -f twitteruserids.txt for cached user ids)")
-            useridlist = []
-            while True:
-                for u in twitter_feeds:
-                    try:
-                        # get user id from screen name using twitter api
-                        user = api.get_user(screen_name=u)
-                        uid = str(user.id)
-                        if uid not in useridlist:
-                            useridlist.append(uid)
-                        time.sleep(randrange(2, 5))
-                    except TweepError as te:
-                        # sleep a bit in case twitter suspends us
-                        logger.warning("Tweepy exception: twitter api error caused by: %s" % te)
-                        logger.info("Sleeping for a random amount of time and retrying...")
-                        time.sleep(randrange(2, 30))
-                        continue
-                    except KeyboardInterrupt:
-                        logger.info("Ctrl-c keyboard interrupt, exiting...")
-                        stream.disconnect()
-                        sys.exit(0)
-                break
-
-            if len(useridlist) > 0:
-                logger.info('Writing twitter user ids to text file %s' % twitter_users_file)
-                try:
-                    f = open(twitter_users_file, "wt", encoding='utf-8')
-                    for i in useridlist:
-                        line = str(i) + "\n"
-                        if type(line) is bytes:
-                            line = line.decode('utf-8')
-                        f.write(line)
-                    f.close()
-                except (IOError, OSError) as e:
-                    logger.warning("Exception: error writing to file caused by: %s" % e)
-                    pass
-                except Exception as e:
-                    raise
-
-        try:
-            # search twitter for keywords
-            logger.info('Stock symbol: ' + str(args.symbol))
-            logger.info('NLTK tokens required: ' + str(nltk_tokens_required))
-            logger.info('NLTK tokens ignored: ' + str(nltk_tokens_ignored))
-            logger.info('Listening for Tweets (ctrl-c to exit)...')
-            if args.keywords is None:
-                logger.info('No keywords entered, following Twitter users...')
-                logger.info('Twitter Feeds: ' + str(twitter_feeds))
-                logger.info('Twitter User Ids: ' + str(useridlist))
-                stream.filter(follow=useridlist, languages=['en'])
-            else:
-                # keywords to search on twitter
-                # add keywords to list
-                keywords = args.keywords.split(',')
-                if args.addtokens:
-                    # add tokens to keywords to list
-                    for f in nltk_tokens_required:
-                        keywords.append(f)
-                logger.info('Searching Twitter for keywords...')
-                logger.info('Twitter keywords: ' + str(keywords))
-                stream.filter(track=keywords, languages=['en'])
-        except TweepError as te:
-            logger.debug("Tweepy Exception: Failed to get tweets caused by: %s" % te)
-        except KeyboardInterrupt:
-            print("Ctrl-c keyboard interrupt, exiting...")
-            stream.disconnect()
-            sys.exit(0)
+    # elif True:
+if __name__ == '__main__':
+    main_news_headlines()

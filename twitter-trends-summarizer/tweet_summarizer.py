@@ -52,12 +52,12 @@ def penn_to_wn(tag):
 
 
 stemmer = PorterStemmer()
-parser = argparse.ArgumentParser()
-parser.add_argument("cleaned_data")
-parser.add_argument("processed_data")
-args = parser.parse_args()
-cleaned_data = open(args.cleaned_data, "r+")
-processed_data = open(args.processed_data, "r+")
+# parser = argparse.ArgumentParser()
+# parser.add_argument("cleaned_data")
+# parser.add_argument("processed_data")
+# args = parser.parse_args()
+cleaned_data = open('oott', "r+") # arg.cleaned
+processed_data = open('oott', "r+") # arg.processed
 index = 0
 tweet_map = {}
 tweet_weights = {}
